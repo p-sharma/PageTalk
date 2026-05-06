@@ -6,12 +6,17 @@ const MODEL_ID = 'Phi-3.5-mini-instruct-q4f16_1-MV';
 const MAX_CONTEXT_WORDS = 3000;
 const MAX_HISTORY_TURNS = 10;
 
+const SPEAKER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
+const STOP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`;
+
 type Message = { role: 'user' | 'assistant' | 'system'; content: string };
 
 let engine: MLCEngine | null = null;
 let pageContext: PageContent | null = null;
 let history: Message[] = [];
 let isGenerating = false;
+const ttsAvailable: boolean = 'speechSynthesis' in window;
+let activeTtsBtn: HTMLButtonElement | null = null;
 
 function truncateText(text: string): string {
   const words = text.split(/\s+/);
@@ -96,11 +101,74 @@ function scrollToBottom(): void {
   if (messages) messages.scrollTop = messages.scrollHeight;
 }
 
+function setTtsBtnState(btn: HTMLButtonElement, state: 'play' | 'stop'): void {
+  btn.innerHTML = state === 'play' ? SPEAKER_SVG : STOP_SVG;
+  btn.title = state === 'play' ? 'Read aloud' : 'Stop';
+  btn.dataset.state = state;
+}
+
+function speak(text: string, btn: HTMLButtonElement): void {
+  speechSynthesis.cancel();
+
+  if (activeTtsBtn && activeTtsBtn !== btn) {
+    setTtsBtnState(activeTtsBtn, 'play');
+  }
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 1.1;
+  utterance.pitch = 1.0;
+  utterance.onend = () => {
+    setTtsBtnState(btn, 'play');
+    if (activeTtsBtn === btn) activeTtsBtn = null;
+  };
+  utterance.onerror = (e: SpeechSynthesisErrorEvent) => {
+    if (e.error !== 'interrupted') {
+      setTtsBtnState(btn, 'play');
+      if (activeTtsBtn === btn) activeTtsBtn = null;
+    }
+  };
+
+  activeTtsBtn = btn;
+  setTtsBtnState(btn, 'stop');
+  speechSynthesis.speak(utterance);
+}
+
+function stopSpeech(btn: HTMLButtonElement): void {
+  speechSynthesis.cancel();
+  setTtsBtnState(btn, 'play');
+  activeTtsBtn = null;
+}
+
 function addMessage(role: 'user' | 'assistant', text: string): HTMLElement {
   const messages = document.getElementById('messages')!;
   const div = document.createElement('div');
   div.className = `message message-${role}`;
-  div.textContent = text;
+
+  if (role === 'assistant') {
+    const textSpan = document.createElement('span');
+    textSpan.className = 'message-text';
+    textSpan.textContent = text;
+    div.appendChild(textSpan);
+
+    if (ttsAvailable) {
+      const btn = document.createElement('button');
+      btn.className = 'tts-btn';
+      btn.hidden = true;
+      setTtsBtnState(btn, 'play');
+      btn.addEventListener('click', () => {
+        const responseText = textSpan.textContent ?? '';
+        if (btn.dataset.state === 'stop') {
+          stopSpeech(btn);
+        } else {
+          speak(responseText, btn);
+        }
+      });
+      div.appendChild(btn);
+    }
+  } else {
+    div.textContent = text;
+  }
+
   messages.appendChild(div);
   scrollToBottom();
   return div;
@@ -142,6 +210,7 @@ async function handleSend(): Promise<void> {
 
   const contextWindow = history.slice(-(MAX_HISTORY_TURNS * 2));
   const assistantBubble = addMessage('assistant', '…');
+  const textSpan = assistantBubble.querySelector<HTMLSpanElement>('.message-text')!;
 
   try {
     const stream = await engine.chat.completions.create({
@@ -153,13 +222,21 @@ async function handleSend(): Promise<void> {
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta?.content ?? '';
       fullResponse += delta;
-      assistantBubble.textContent = fullResponse || '…';
+      textSpan.textContent = fullResponse || '…';
       scrollToBottom();
     }
 
     history.push({ role: 'assistant', content: fullResponse });
+
+    if (ttsAvailable && fullResponse) {
+      const ttsBtn = assistantBubble.querySelector<HTMLButtonElement>('.tts-btn');
+      if (ttsBtn) {
+        ttsBtn.hidden = false;
+        speak(fullResponse, ttsBtn);
+      }
+    }
   } catch {
-    assistantBubble.textContent = 'Something went wrong. Please try again.';
+    textSpan.textContent = 'Something went wrong. Please try again.';
     history.pop();
   } finally {
     isGenerating = false;
