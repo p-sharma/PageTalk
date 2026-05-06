@@ -8,6 +8,7 @@ const MAX_HISTORY_TURNS = 10;
 
 const SPEAKER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
 const STOP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`;
+const MIC_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
 
 type Message = { role: 'user' | 'assistant' | 'system'; content: string };
 
@@ -78,6 +79,7 @@ function renderChat(): void {
     <div id="messages"></div>
     <div id="input-area">
       <textarea id="user-input" rows="3" placeholder="Ask about this page…"></textarea>
+      <button id="mic-btn" disabled title="Voice input coming soon">${MIC_SVG}</button>
       <button id="send-btn">Send</button>
     </div>
   `;
@@ -145,9 +147,21 @@ function addMessage(role: 'user' | 'assistant', text: string): HTMLElement {
   div.className = `message message-${role}`;
 
   if (role === 'assistant') {
+    const thinking = document.createElement('span');
+    thinking.className = 'thinking-indicator';
+    thinking.innerHTML = '<span></span><span></span><span></span>';
+
     const textSpan = document.createElement('span');
     textSpan.className = 'message-text';
-    textSpan.textContent = text;
+
+    if (text) {
+      textSpan.textContent = text;
+      thinking.hidden = true;
+    } else {
+      textSpan.hidden = true;
+    }
+
+    div.appendChild(thinking);
     div.appendChild(textSpan);
 
     if (ttsAvailable) {
@@ -209,8 +223,9 @@ async function handleSend(): Promise<void> {
   history.push({ role: 'user', content: text });
 
   const contextWindow = history.slice(-(MAX_HISTORY_TURNS * 2));
-  const assistantBubble = addMessage('assistant', '…');
+  const assistantBubble = addMessage('assistant', '');
   const textSpan = assistantBubble.querySelector<HTMLSpanElement>('.message-text')!;
+  const thinkingDots = assistantBubble.querySelector<HTMLSpanElement>('.thinking-indicator')!;
 
   try {
     const stream = await engine.chat.completions.create({
@@ -219,10 +234,16 @@ async function handleSend(): Promise<void> {
     });
 
     let fullResponse = '';
+    let revealed = false;
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta?.content ?? '';
       fullResponse += delta;
-      textSpan.textContent = fullResponse || '…';
+      if (!revealed && fullResponse) {
+        thinkingDots.hidden = true;
+        textSpan.hidden = false;
+        revealed = true;
+      }
+      textSpan.textContent = fullResponse;
       scrollToBottom();
     }
 
