@@ -32,18 +32,22 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'GET_PAGE_CONTENT') {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tabId = tabs[0]?.id;
+      console.log('GET_PAGE_CONTENT: active tab', tabs[0]?.url, 'tabId', tabId);
       if (tabId === undefined) {
+        console.error('GET_PAGE_CONTENT: no active tab found');
         sendResponse({ type: 'PAGE_CONTENT_ERROR', error: 'No active tab found' });
         return;
       }
       chrome.tabs.sendMessage(tabId, { type: 'GET_PAGE_CONTENT' }, (response) => {
         if (chrome.runtime.lastError) {
+          console.error('GET_PAGE_CONTENT: content script error:', chrome.runtime.lastError.message);
           sendResponse({
             type: 'PAGE_CONTENT_ERROR',
             error: chrome.runtime.lastError.message ?? 'Content script unreachable',
           });
           return;
         }
+        console.log('GET_PAGE_CONTENT: content script responded', response?.type);
         sendResponse(response);
       });
     });

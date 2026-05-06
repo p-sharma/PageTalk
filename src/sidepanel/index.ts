@@ -290,7 +290,14 @@ function addMessage(role: 'user' | 'assistant', text: string): HTMLElement {
 async function fetchPageContent(): Promise<PageContent | null> {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ type: 'GET_PAGE_CONTENT' }, (response) => {
-      if (chrome.runtime.lastError || response?.type !== 'PAGE_CONTENT_RESULT') {
+      if (chrome.runtime.lastError) {
+        console.error('fetchPageContent runtime error:', chrome.runtime.lastError.message);
+        resolve(null);
+        return;
+      }
+      console.log('fetchPageContent raw response:', response);
+      if (response?.type !== 'PAGE_CONTENT_RESULT') {
+        console.warn('fetchPageContent unexpected response type:', response?.type, response);
         resolve(null);
         return;
       }
@@ -309,11 +316,21 @@ async function handleSend(): Promise<void> {
   input.value = '';
   isGenerating = true;
   setSendEnabled(false);
-  addMessage('user', text);
 
-  if (pageContext === null) {
-    pageContext = await fetchPageContent();
+  const freshContent = await fetchPageContent();
+  if (freshContent) {
+    if (pageContext && freshContent.url !== pageContext.url) {
+      history = [];
+      const messages = document.getElementById('messages');
+      if (messages) messages.innerHTML = '';
+    }
+    pageContext = freshContent;
+    console.log('Page content fetched:', pageContext.title, pageContext.url, `~${pageContext.text.split(/\s+/).length} words`);
+  } else {
+    console.warn('Page content fetch returned null');
   }
+
+  addMessage('user', text);
 
   const systemPrompt = pageContext
     ? buildSystemPrompt(pageContext)
@@ -355,7 +372,8 @@ async function handleSend(): Promise<void> {
         speak(fullResponse, ttsBtn);
       }
     }
-  } catch {
+  } catch (err) {
+    console.error('Chat error:', err);
     textSpan.textContent = 'Something went wrong. Please try again.';
     history.pop();
   } finally {
