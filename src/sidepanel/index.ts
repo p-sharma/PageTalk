@@ -76,6 +76,9 @@ function renderLoading(progress: number, text: string): void {
 
 function renderChat(): void {
   document.getElementById('app')!.innerHTML = `
+    <div id="chat-header">
+      <button id="clear-btn">Clear chat</button>
+    </div>
     <div id="messages"></div>
     <div id="input-area">
       <textarea id="user-input" rows="3" placeholder="Ask about this page…"></textarea>
@@ -85,6 +88,7 @@ function renderChat(): void {
   `;
 
   document.getElementById('send-btn')!.addEventListener('click', handleSend);
+  document.getElementById('clear-btn')!.addEventListener('click', resetChat);
   (document.getElementById('user-input') as HTMLTextAreaElement).addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -94,8 +98,19 @@ function renderChat(): void {
 }
 
 function setSendEnabled(enabled: boolean): void {
-  const btn = document.getElementById('send-btn') as HTMLButtonElement | null;
-  if (btn) btn.disabled = !enabled;
+  const sendBtn = document.getElementById('send-btn') as HTMLButtonElement | null;
+  if (sendBtn) sendBtn.disabled = !enabled;
+  const clearBtn = document.getElementById('clear-btn') as HTMLButtonElement | null;
+  if (clearBtn) clearBtn.disabled = !enabled;
+}
+
+function resetChat(): void {
+  if (ttsAvailable) speechSynthesis.cancel();
+  if (activeTtsBtn) { activeTtsBtn = null; }
+  history = [];
+  pageContext = null;
+  const messages = document.getElementById('messages');
+  if (messages) messages.innerHTML = '';
 }
 
 function scrollToBottom(): void {
@@ -285,5 +300,11 @@ async function init(): Promise<void> {
     renderError(err instanceof Error ? err.message : String(err));
   }
 }
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === 'TAB_NAVIGATED') {
+    resetChat();
+  }
+});
 
 init();

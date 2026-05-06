@@ -4,6 +4,30 @@ chrome.action.onClicked.addListener((tab) => {
   }
 });
 
+let activeTabUrl = '';
+
+function notifyNavigation(url: string): void {
+  if (url === activeTabUrl) return;
+  activeTabUrl = url;
+  chrome.runtime.sendMessage({ type: 'TAB_NAVIGATED', url }).catch(() => {
+    // Sidepanel not open — ignore
+  });
+}
+
+chrome.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
+  if (changeInfo.status !== 'complete' || !tab.active) return;
+  notifyNavigation(tab.url ?? '');
+});
+
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  try {
+    const tab = await chrome.tabs.get(activeInfo.tabId);
+    notifyNavigation(tab.url ?? '');
+  } catch {
+    // Tab may have been closed
+  }
+});
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'GET_PAGE_CONTENT') {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
