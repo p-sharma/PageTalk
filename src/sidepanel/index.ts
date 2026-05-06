@@ -2,7 +2,7 @@ import { CreateMLCEngine, InitProgressReport } from '@mlc-ai/web-llm';
 import type { MLCEngine } from '@mlc-ai/web-llm';
 import type { PageContent } from '../types/messages';
 
-const MODEL_ID = 'Phi-3.5-mini-instruct-q4f16_1-MV';
+const MODEL_ID = 'Phi-3.5-mini-instruct-q4f16_1-MLC';
 const MAX_CONTEXT_WORDS = 3000;
 const MAX_HISTORY_TURNS = 10;
 const DOWNLOAD_STATE_KEY = 'pagetalk_model_downloaded';
