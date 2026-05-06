@@ -5,10 +5,12 @@ import type { PageContent } from '../types/messages';
 const MODEL_ID = 'Phi-3.5-mini-instruct-q4f16_1-MV';
 const MAX_CONTEXT_WORDS = 3000;
 const MAX_HISTORY_TURNS = 10;
+const DOWNLOAD_STATE_KEY = 'pagetalk_model_downloaded';
 
 const SPEAKER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
 const STOP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`;
 const MIC_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
+const CHECK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
 
 type Message = { role: 'user' | 'assistant' | 'system'; content: string };
 
@@ -18,6 +20,8 @@ let history: Message[] = [];
 let isGenerating = false;
 const ttsAvailable: boolean = 'speechSynthesis' in window;
 let activeTtsBtn: HTMLButtonElement | null = null;
+let downloadStartTime: number | null = null;
+let downloadStartProgress: number | null = null;
 
 function truncateText(text: string): string {
   const words = text.split(/\s+/);
@@ -35,11 +39,16 @@ URL: ${page.url}
 ${truncateText(page.text)}`;
 }
 
+function formatTimeRemaining(seconds: number): string {
+  if (seconds < 60) return `~${Math.ceil(seconds)} sec remaining`;
+  return `~${Math.ceil(seconds / 60)} min remaining`;
+}
+
 function renderUnsupported(): void {
   document.getElementById('app')!.innerHTML = `
     <div class="error-box">
       <strong>WebGPU not supported</strong>
-      <p>PageTalk requires WebGPU for local inference. Use Chrome 113+ or Edge 113+ with a compatible GPU.</p>
+      <p>PageTalk requires WebGPU to run the AI model locally. Use Chrome 113+ or Edge 113+ with hardware acceleration enabled in browser settings.</p>
     </div>
   `;
 }
@@ -53,25 +62,100 @@ function renderError(message: string): void {
   `;
 }
 
-function renderLoading(progress: number, text: string): void {
+function renderWelcome(): void {
+  document.getElementById('app')!.innerHTML = `
+    <div id="welcome-state">
+      <div class="welcome-content">
+        <h1 class="welcome-title">PageTalk</h1>
+        <p class="welcome-subtitle">Chat with any web page using a private, local AI model.</p>
+        <div class="download-info-box">
+          <p class="download-info-title">One-time setup required</p>
+          <p class="download-info-body">PageTalk downloads a 2&ndash;4 GB AI model to your device. This happens once &mdash; after that, everything runs locally with no data sent anywhere.</p>
+        </div>
+        <button id="download-btn" class="primary-btn">Download and get started</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('download-btn')!.addEventListener('click', startDownload);
+}
+
+function renderProgress(progress: number, mainText: string, detailText?: string): void {
   const app = document.getElementById('app')!;
 
-  if (!document.getElementById('loading-state')) {
+  if (!document.getElementById('progress-state')) {
     app.innerHTML = `
-      <div id="loading-state">
-        <p class="loading-label">Loading model&hellip;</p>
+      <div id="progress-state">
+        <p id="progress-main" class="progress-main"></p>
         <div class="progress-track">
           <div id="progress-fill" class="progress-fill"></div>
         </div>
-        <p id="progress-text" class="progress-text"></p>
+        <div class="progress-footer">
+          <span id="progress-pct" class="progress-pct"></span>
+          <span id="progress-detail" class="progress-detail"></span>
+        </div>
       </div>
     `;
   }
 
+  const mainEl = document.getElementById('progress-main');
   const fill = document.getElementById('progress-fill');
-  const label = document.getElementById('progress-text');
+  const pctEl = document.getElementById('progress-pct');
+  const detailEl = document.getElementById('progress-detail');
+
+  if (mainEl) mainEl.textContent = mainText;
   if (fill) fill.style.width = `${Math.round(progress * 100)}%`;
-  if (label) label.textContent = text;
+  if (pctEl) pctEl.textContent = progress > 0 ? `${Math.round(progress * 100)}%` : '';
+  if (detailEl) detailEl.textContent = detailText ?? '';
+}
+
+function renderSuccess(): void {
+  document.getElementById('app')!.innerHTML = `
+    <div id="success-state">
+      <div class="success-icon">${CHECK_SVG}</div>
+      <h2 class="success-title">Model ready</h2>
+      <p class="success-body">PageTalk is set up. Navigate to any page and start chatting.</p>
+    </div>
+  `;
+}
+
+function handleDownloadProgress(report: InitProgressReport): void {
+  const now = Date.now();
+  const isActiveDownload = report.text.toLowerCase().includes('fetch');
+
+  let etaText = '';
+  if (isActiveDownload && report.progress > 0 && report.progress < 1) {
+    if (downloadStartTime === null) {
+      downloadStartTime = now;
+      downloadStartProgress = report.progress;
+    } else {
+      const elapsedSec = (now - downloadStartTime) / 1000;
+      const progressDelta = report.progress - (downloadStartProgress ?? 0);
+      if (elapsedSec > 5 && progressDelta > 0.005) {
+        const rate = progressDelta / elapsedSec;
+        const remaining = (1 - report.progress) / rate;
+        etaText = formatTimeRemaining(remaining);
+      }
+    }
+  }
+
+  renderProgress(report.progress, 'Downloading model…', etaText || report.text);
+}
+
+async function startDownload(): Promise<void> {
+  downloadStartTime = null;
+  downloadStartProgress = null;
+  renderProgress(0, 'Downloading model…', 'Starting…');
+
+  try {
+    engine = await CreateMLCEngine(MODEL_ID, {
+      initProgressCallback: handleDownloadProgress,
+    });
+    localStorage.setItem(DOWNLOAD_STATE_KEY, 'true');
+    renderSuccess();
+    setTimeout(() => renderChat(), 2000);
+  } catch (err) {
+    renderError(err instanceof Error ? err.message : String(err));
+  }
 }
 
 function renderChat(): void {
@@ -287,17 +371,23 @@ async function init(): Promise<void> {
     return;
   }
 
-  renderLoading(0, 'Starting…');
+  const isReturningUser = localStorage.getItem(DOWNLOAD_STATE_KEY) === 'true';
 
-  try {
-    engine = await CreateMLCEngine(MODEL_ID, {
-      initProgressCallback: (report: InitProgressReport) => {
-        renderLoading(report.progress, report.text);
-      },
-    });
-    renderChat();
-  } catch (err) {
-    renderError(err instanceof Error ? err.message : String(err));
+  if (isReturningUser) {
+    renderProgress(0, 'Loading model…');
+    try {
+      engine = await CreateMLCEngine(MODEL_ID, {
+        initProgressCallback: (report: InitProgressReport) => {
+          renderProgress(report.progress, 'Loading model…', report.text);
+        },
+      });
+      renderChat();
+    } catch (err) {
+      localStorage.removeItem(DOWNLOAD_STATE_KEY);
+      renderError(err instanceof Error ? err.message : String(err));
+    }
+  } else {
+    renderWelcome();
   }
 }
 
