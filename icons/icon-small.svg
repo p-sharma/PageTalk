@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 128 128">
+  <!-- Simplified for 16px: no text lines or dots, heavier strokes -->
+  <path d="M28 8 H72 L96 32 V100 a8 8 0 0 1 -8 8 H28 a8 8 0 0 1 -8 -8 V16 a8 8 0 0 1 8 -8 Z"
+        fill="#ffffff" stroke="#1e40af" stroke-width="14" stroke-linejoin="round"/>
+  <path d="M60 64 H110 a14 14 0 0 1 14 14 V98 a14 14 0 0 1 -14 14 H90 L68 126 L70 112 H60 a14 14 0 0 1 -14 -14 V78 a14 14 0 0 1 14 -14 Z"
+        fill="#2563eb" stroke="#ffffff" stroke-width="8" stroke-linejoin="round" paint-order="stroke"/>
+</svg>

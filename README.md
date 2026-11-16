@@ -14,11 +14,7 @@ Idea → Claude → Notion PRD → Claude → Jira Tickets → Claude Code → W
 ## Setup
 
 ```bash
-# Install dependencies
 npm install
-
-# Generate placeholder icons (run once after cloning)
-npm run icons
 ```
 
 ## Development

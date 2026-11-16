@@ -4,8 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "webpack --mode development --watch",
-    "build": "webpack --mode production",
-    "icons": "node scripts/create-icons.js"
+    "build": "webpack --mode production"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.73",

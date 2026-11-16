@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Page with folded corner -->
+  <path d="M30 10 H74 L96 32 V98 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V16 a6 6 0 0 1 6 -6 Z"
+        fill="#ffffff" stroke="#1e40af" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M74 10 V26 a6 6 0 0 0 6 6 H96" fill="none" stroke="#1e40af" stroke-width="6" stroke-linejoin="round"/>
+  <!-- Page text lines -->
+  <rect x="36" y="44" width="44" height="7" rx="3.5" fill="#93c5fd"/>
+  <rect x="36" y="56" width="30" height="7" rx="3.5" fill="#93c5fd"/>
+  <!-- Speech bubble -->
+  <path d="M64 66 H108 a14 14 0 0 1 14 14 V96 a14 14 0 0 1 -14 14 H88 L70 124 L72 110 H64 a14 14 0 0 1 -14 -14 V80 a14 14 0 0 1 14 -14 Z"
+        fill="#2563eb" stroke="#ffffff" stroke-width="6" stroke-linejoin="round" paint-order="stroke"/>
+  <circle cx="70" cy="88" r="6" fill="#ffffff"/>
+  <circle cx="86" cy="88" r="6" fill="#ffffff"/>
+  <circle cx="102" cy="88" r="6" fill="#ffffff"/>
+</svg>

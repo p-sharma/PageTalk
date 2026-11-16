@@ -7,7 +7,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 npm run dev          # webpack watch mode (development, with source maps)
 npm run build        # production build to dist/
-npm run icons        # regenerate placeholder icons in icons/
 ```
 
 After any build, reload the extension in Chrome at `chrome://extensions` by clicking the reload button on the PageTalk card.
@@ -33,7 +32,7 @@ After any build, reload the extension in Chrome at `chrome://extensions` by clic
 
   **Streaming and TTS:** While waiting for the first token, the assistant bubble shows three animated bouncing dots (`.thinking-indicator`); on the first token they hide and the text span reveals. Responses stream token-by-token. On completion, the response is spoken via `SpeechSynthesis` (rate 1.1) and a per-bubble speaker/stop button appears for replay or cancellation. TTS is silently skipped if `speechSynthesis` is absent.
 
-**Build output** (`dist/`): each context compiles to a flat self-contained JS file (`background.js`, `content.js`, `sidepanel.js`). `HtmlWebpackPlugin` injects the sidepanel script into `sidepanel.html`; `CopyWebpackPlugin` copies `manifest.json` and `icons/`. No shared runtime chunks (`runtimeChunk: false`, `splitChunks: false`) — required for Chrome extensions.
+**Build output** (`dist/`): each context compiles to a flat self-contained JS file (`background.js`, `content.js`, `sidepanel.js`). `HtmlWebpackPlugin` injects the sidepanel script into `sidepanel.html`; `CopyWebpackPlugin` copies `manifest.json` and `icons/`. Icons are hand-drawn SVGs (`icons/icon.svg`, plus `icons/icon-small.svg` simplified for 16px) exported once to the committed PNGs; there is no generator script, so re-export the PNGs by hand after editing an SVG. No shared runtime chunks (`runtimeChunk: false`, `splitChunks: false`) — required for Chrome extensions.
 
 **Key dependencies:**
 - `@mlc-ai/web-llm` — in-browser LLM inference via WebGPU/WASM; ships its own TypeScript types
