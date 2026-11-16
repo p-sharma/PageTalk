@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "PageTalk",
   "version": "0.1.0",
-  "description": "Chat with any web page using a local LLM",
+  "description": "Chat with Reddit web page using a local LLM",
   "permissions": ["activeTab", "sidePanel", "storage"],
   "background": {
     "service_worker": "background.js"
