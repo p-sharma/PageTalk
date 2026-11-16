@@ -16,7 +16,7 @@ export function extractPageContent(): PageContent {
     const docClone = document.cloneNode(true) as Document;
     const article = new Readability(docClone).parse();
 
-    if (article && article.textContent.trim().length > 0) {
+    if (article?.textContent && article.textContent.trim().length > 0) {
       return {
         title: article.title || document.title,
         text: cleanText(article.textContent),

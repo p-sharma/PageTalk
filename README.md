@@ -8,7 +8,7 @@ Idea → Claude → Notion PRD → Claude → Jira Tickets → Claude Code → W
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 20.9+
 - Chrome 114+ (for the Side Panel API)
 
 ## Setup
